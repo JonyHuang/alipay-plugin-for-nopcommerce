@@ -80,7 +80,6 @@
   <ItemGroup>
     <Compile Include="Controllers\PaymentAliPayController.cs" />
     <Compile Include="Models\ConfigurationModel.cs" />
-    <Compile Include="Models\PaymentInfoModel.cs" />
     <Compile Include="AliPayPaymentProcessor.cs" />
     <Compile Include="AliPayPaymentSettings.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -104,6 +103,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="logo.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Views\PaymentAliPay\Configure.cshtml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -119,9 +121,6 @@
   <ItemGroup>
     <Content Include="Description.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="logo.jpg">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Notes.txt" />
   </ItemGroup>

@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Web.Routing;
 using Nop.Core;
-using Nop.Core.Domain;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
@@ -24,25 +23,36 @@ namespace Nop.Plugin.Payments.AliPay
     /// </summary>
     public class AliPayPaymentProcessor : BasePlugin, IPaymentMethod
     {
+        #region Constants
+
+        private const string ShowUrl = "http://www.alipay.com/";
+        private const string Service = "create_direct_pay_by_user";
+        private const string SignType = "MD5";
+        private const string InputCharset = "utf-8";
+
+        #endregion
+
         #region Fields
 
-        private readonly AliPayPaymentSettings _aliPayPaymentSettings;
         private readonly ISettingService _settingService;
         private readonly IWebHelper _webHelper;
         private readonly IStoreContext _storeContext;
+        private readonly AliPayPaymentSettings _aliPayPaymentSettings;
 
         #endregion
 
         #region Ctor
 
-        public AliPayPaymentProcessor(AliPayPaymentSettings aliPayPaymentSettings,
-            ISettingService settingService, IWebHelper webHelper,
-            IStoreContext storeContext)
+        public AliPayPaymentProcessor(
+            ISettingService settingService, 
+            IWebHelper webHelper,
+            IStoreContext storeContext,
+            AliPayPaymentSettings aliPayPaymentSettings)
         {
-            this._aliPayPaymentSettings = aliPayPaymentSettings;
             this._settingService = settingService;
             this._webHelper = webHelper;
             this._storeContext = storeContext;
+            this._aliPayPaymentSettings = aliPayPaymentSettings;
         }
 
         #endregion
@@ -52,119 +62,95 @@ namespace Nop.Plugin.Payments.AliPay
         /// <summary>
         /// Gets MD5 hash
         /// </summary>
-        /// <param name="Input">Input</param>
-        /// <param name="Input_charset">Input charset</param>
+        /// <param name="input">Input</param>
+        /// <param name="inputCharset">Input charset</param>
         /// <returns>Result</returns>
-        public string GetMD5(string Input, string Input_charset)
+        internal string GetMD5(string input, string inputCharset)
         {
             MD5 md5 = new MD5CryptoServiceProvider();
-            byte[] t = md5.ComputeHash(Encoding.GetEncoding(Input_charset).GetBytes(Input));
-            StringBuilder sb = new StringBuilder(32);
-            for (int i = 0; i < t.Length; i++)
+            byte[] t = md5.ComputeHash(Encoding.GetEncoding(inputCharset).GetBytes(input));
+            var sb = new StringBuilder(32);
+
+            foreach (var b in t)
             {
-                sb.Append(t[i].ToString("x").PadLeft(2, '0'));
+                sb.AppendFormat("{0:X}", b);
             }
+
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Bubble sort
-        /// </summary>
-        /// <param name="Input">Input</param>
-        /// <returns>Result</returns>
-        public string[] BubbleSort(string[] Input)
-        {
-            int i, j;
-            string temp;
-
-            bool exchange;
-
-            for (i = 0; i < Input.Length; i++)
-            {
-                exchange = false;
-
-                for (j = Input.Length - 2; j >= i; j--)
-                {
-                    if (System.String.CompareOrdinal(Input[j + 1], Input[j]) < 0)
-                    {
-                        temp = Input[j + 1];
-                        Input[j + 1] = Input[j];
-                        Input[j] = temp;
-
-                        exchange = true;
-                    }
-                }
-
-                if (!exchange)
-                {
-                    break;
-                }
-            }
-            return Input;
         }
 
         /// <summary>
         /// Create URL
         /// </summary>
-        /// <param name="Para">Para</param>
-        /// <param name="InputCharset">Input charset</param>
-        /// <param name="Key">Key</param>
+        /// <param name="para">Para</param>
+        /// <param name="inputCharset">Input charset</param>
+        /// <param name="key">Key</param>
         /// <returns>Result</returns>
-        public string CreatUrl(string[] Para, string InputCharset, string Key)
+        private string CreatUrl(string[] para, string inputCharset, string key)
         {
+            Array.Sort(para, StringComparer.InvariantCulture);
+
             int i;
-            string[] Sortedstr = BubbleSort(Para);
-            StringBuilder prestr = new StringBuilder();
+            var prestr = new StringBuilder();
 
-            for (i = 0; i < Sortedstr.Length; i++)
+            for (i = 0; i < para.Length; i++)
             {
-                if (i == Sortedstr.Length - 1)
-                {
-                    prestr.Append(Sortedstr[i]);
+                prestr.Append(para[i]);
 
-                }
-                else
+                if (i < para.Length - 1)
                 {
-                    prestr.Append(Sortedstr[i] + "&");
+                    prestr.Append("&");
                 }
-
             }
 
-            prestr.Append(Key);
-            string sign = GetMD5(prestr.ToString(), InputCharset);
+            prestr.Append(key);
+
+            var sign = GetMD5(prestr.ToString(), inputCharset);
+
             return sign;
         }
 
         /// <summary>
         /// Gets HTTP
         /// </summary>
-        /// <param name="StrUrl">Url</param>
-        /// <param name="Timeout">Timeout</param>
+        /// <param name="strUrl">Url</param>
+        /// <param name="timeout">Timeout</param>
         /// <returns>Result</returns>
-        public string Get_Http(string StrUrl, int Timeout)
+        internal string GetHttp(string strUrl, int timeout)
         {
-            string strResult = string.Empty;
+            var strResult = string.Empty;
+
             try
             {
-                HttpWebRequest myReq = (HttpWebRequest)HttpWebRequest.Create(StrUrl);
-                myReq.Timeout = Timeout;
-                HttpWebResponse HttpWResp = (HttpWebResponse)myReq.GetResponse();
-                Stream myStream = HttpWResp.GetResponseStream();
-                StreamReader sr = new StreamReader(myStream, Encoding.Default);
-                StringBuilder strBuilder = new StringBuilder();
-                while (-1 != sr.Peek())
-                {
-                    strBuilder.Append(sr.ReadLine());
-                }
+                var myReq = (HttpWebRequest)WebRequest.Create(strUrl);
 
-                strResult = strBuilder.ToString();
+                myReq.Timeout = timeout;
+
+                var httpWResp = (HttpWebResponse)myReq.GetResponse();
+                var myStream = httpWResp.GetResponseStream();
+                if (myStream != null)
+                {
+                    using (var sr = new StreamReader(myStream, Encoding.Default))
+                    {
+                        var strBuilder = new StringBuilder();
+
+                        while (-1 != sr.Peek())
+                        {
+                            strBuilder.Append(sr.ReadLine());
+                        }
+
+                        strResult = strBuilder.ToString();
+                    }
+                }
             }
             catch (Exception exc)
             {
-                strResult = "Error: " + exc.Message;
+                strResult = string.Format("Error: {0}", exc.Message);
             }
+
             return strResult;
         }
+
         #endregion
 
         #region Methods
@@ -176,8 +162,8 @@ namespace Nop.Plugin.Payments.AliPay
         /// <returns>Process payment result</returns>
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            var result = new ProcessPaymentResult();
-            result.NewPaymentStatus = PaymentStatus.Pending;
+            var result = new ProcessPaymentResult {NewPaymentStatus = PaymentStatus.Pending};
+
             return result;
         }
 
@@ -188,61 +174,54 @@ namespace Nop.Plugin.Payments.AliPay
         public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             //string gateway = "https://www.alipay.com/cooperate/gateway.do?";
-            string service = "create_direct_pay_by_user";
 
-            string seller_email = _aliPayPaymentSettings.SellerEmail;
-            string sign_type = "MD5";
-            string key = _aliPayPaymentSettings.Key;
-            string partner = _aliPayPaymentSettings.Partner;
-            string input_charset = "utf-8";
+            var sellerEmail = _aliPayPaymentSettings.SellerEmail;
+            var key = _aliPayPaymentSettings.Key;
+            var partner = _aliPayPaymentSettings.Partner;
+            var outTradeNo = postProcessPaymentRequest.Order.Id.ToString();
+            var subject = _storeContext.CurrentStore.Name;
+            var body = "Order from " + _storeContext.CurrentStore.Name;
+            var totalFee = postProcessPaymentRequest.Order.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture);
+            var notifyUrl = _webHelper.GetStoreLocation(false) + "Plugins/PaymentAliPay/Notify";
+            var returnUrl = _webHelper.GetStoreLocation(false) + "Plugins/PaymentAliPay/Return";
 
-            string show_url = "http://www.alipay.com/";
-
-            string out_trade_no = postProcessPaymentRequest.Order.Id.ToString();
-            string subject = _storeContext.CurrentStore.Name;
-            string body = "Order from " + _storeContext.CurrentStore.Name;
-            string total_fee = postProcessPaymentRequest.Order.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture);
-
-            string notify_url = _webHelper.GetStoreLocation(false) + "Plugins/PaymentAliPay/Notify";
-            string return_url = _webHelper.GetStoreLocation(false) + "Plugins/PaymentAliPay/Return";
             string[] para ={
-                               "service="+service,
+                               "service=" + Service,
                                "partner=" + partner,
-                               "seller_email=" + seller_email,
-                               "out_trade_no=" + out_trade_no,
+                               "seller_email=" + sellerEmail,
+                               "out_trade_no=" + outTradeNo,
                                "subject=" + subject,
                                "body=" + body,
-                               "total_fee=" + total_fee,
-                               "show_url=" + show_url,
+                               "total_fee=" + totalFee,
+                               "show_url=" + ShowUrl,
                                "payment_type=1",
-                               "notify_url=" + notify_url,
-                               "return_url=" + return_url,
-                               "_input_charset=" + input_charset
+                               "notify_url=" + notifyUrl,
+                               "return_url=" + returnUrl,
+                               "_input_charset=" + InputCharset
                            };
 
-            string aliay_url = CreatUrl(
-                para,
-                input_charset,
-                key
-                );
-            var post = new RemotePost();
-            post.FormName = "alipaysubmit";
-            post.Url = "https://www.alipay.com/cooperate/gateway.do?_input_charset=utf-8";
-            post.Method = "POST";
+            var aliayUrl = CreatUrl(para, InputCharset, key);
 
-            post.Add("service", service);
+            var post = new RemotePost
+            {
+                FormName = "alipaysubmit",
+                Url = "https://www.alipay.com/cooperate/gateway.do?_input_charset=utf-8",
+                Method = "POST"
+            };
+
+            post.Add("service", Service);
             post.Add("partner", partner);
-            post.Add("seller_email", seller_email);
-            post.Add("out_trade_no", out_trade_no);
+            post.Add("seller_email", sellerEmail);
+            post.Add("out_trade_no", outTradeNo);
             post.Add("subject", subject);
             post.Add("body", body);
-            post.Add("total_fee", total_fee);
-            post.Add("show_url", show_url);
-            post.Add("return_url", return_url);
-            post.Add("notify_url", notify_url);
+            post.Add("total_fee", totalFee);
+            post.Add("show_url", ShowUrl);
+            post.Add("return_url", returnUrl);
+            post.Add("notify_url", notifyUrl);
             post.Add("payment_type", "1");
-            post.Add("sign", aliay_url);
-            post.Add("sign_type", sign_type);
+            post.Add("sign", aliayUrl);
+            post.Add("sign_type", SignType);
 
             post.Post();
         }
@@ -278,7 +257,9 @@ namespace Nop.Plugin.Payments.AliPay
         public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
         {
             var result = new CapturePaymentResult();
+
             result.AddError("Capture method not supported");
+
             return result;
         }
 
@@ -290,7 +271,9 @@ namespace Nop.Plugin.Payments.AliPay
         public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
+
             result.AddError("Refund method not supported");
+
             return result;
         }
 
@@ -302,7 +285,9 @@ namespace Nop.Plugin.Payments.AliPay
         public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
         {
             var result = new VoidPaymentResult();
+
             result.AddError("Void method not supported");
+
             return result;
         }
 
@@ -314,7 +299,9 @@ namespace Nop.Plugin.Payments.AliPay
         public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
+
             result.AddError("Recurring payment not supported");
+
             return result;
         }
 
@@ -326,7 +313,9 @@ namespace Nop.Plugin.Payments.AliPay
         public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             var result = new CancelRecurringPaymentResult();
+
             result.AddError("Recurring payment not supported");
+
             return result;
         }
 
@@ -348,10 +337,7 @@ namespace Nop.Plugin.Payments.AliPay
                 return false;
 
             //let's ensure that at least 1 minute passed after order is placed
-            if ((DateTime.UtcNow - order.CreatedOnUtc).TotalMinutes < 1)
-                return false;
-
-            return true;
+            return !((DateTime.UtcNow - order.CreatedOnUtc).TotalMinutes < 1);
         }
 
         /// <summary>
@@ -395,6 +381,7 @@ namespace Nop.Plugin.Payments.AliPay
                 Partner= "",
                 AdditionalFee = 0,
             };
+
             _settingService.SaveSetting(settings);
 
             //locales
@@ -411,7 +398,6 @@ namespace Nop.Plugin.Payments.AliPay
             base.Install();
         }
 
-
         public override void Uninstall()
         {
             //locales
@@ -427,6 +413,7 @@ namespace Nop.Plugin.Payments.AliPay
             
             base.Uninstall();
         }
+
         #endregion
 
         #region Properies

@@ -6,6 +6,8 @@ namespace Nop.Plugin.Payments.AliPay
 {
     public partial class RouteProvider : IRouteProvider
     {
+        #region Methods
+
         public void RegisterRoutes(RouteCollection routes)
         {
             //Notify
@@ -22,6 +24,11 @@ namespace Nop.Plugin.Payments.AliPay
                  new[] { "Nop.Plugin.Payments.AliPay.Controllers" }
             );
         }
+
+        #endregion
+
+        #region Properties
+
         public int Priority
         {
             get
@@ -29,5 +36,7 @@ namespace Nop.Plugin.Payments.AliPay
                 return 0;
             }
         }
+
+        #endregion
     }
 }
