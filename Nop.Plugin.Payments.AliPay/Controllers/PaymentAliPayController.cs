@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
 using System.Text;
 using System.Web.Mvc;
 using Nop.Core;
@@ -66,7 +68,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
                 AdditionalFee = _aliPayPaymentSettings.AdditionalFee
             };
 
-            return View("~/Plugins/Payments.AliPay/Views/PaymentAliPay/Configure.cshtml", model);
+            return View("~/Plugins/Payments.AliPay/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
@@ -93,7 +95,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         [ChildActionOnly]
         public ActionResult PaymentInfo()
         {
-            return View("~/Plugins/Payments.AliPay/Views/PaymentAliPay/PaymentInfo.cshtml");
+            return View("~/Plugins/Payments.AliPay/Views/PaymentInfo.cshtml");
         }
 
         [NonAction]
@@ -117,9 +119,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
 
-            if (processor == null 
-                || !processor.IsPaymentMethodActive(_paymentSettings) 
-                || !processor.PluginDescriptor.Installed)
+            if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
                 throw new NopException("AliPay module cannot be loaded");
 
             var partner = _aliPayPaymentSettings.Partner;
@@ -132,67 +132,79 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             if (string.IsNullOrEmpty(key))
                 throw new Exception("Partner is not set");
 
-            var _input_charset = "utf-8";
-
             var alipayNotifyUrl = string.Format("https://www.alipay.com/cooperate/gateway.do?service=notify_verify&partner={0}&notify_id={1}", partner, Request.Form["notify_id"]);
 
-            var responseTxt = processor.GetHttp(alipayNotifyUrl, 120000);
+            var responseTxt = string.Empty;
+
+            try
+            {
+                var myReq = (HttpWebRequest)WebRequest.Create(alipayNotifyUrl);
+                myReq.Timeout = 120000;
+
+                var httpWResp = (HttpWebResponse)myReq.GetResponse();
+                var myStream = httpWResp.GetResponseStream();
+                if (myStream != null)
+                {
+                    using (var sr = new StreamReader(myStream, Encoding.Default))
+                    {
+                        var strBuilder = new StringBuilder();
+
+                        while (-1 != sr.Peek())
+                        {
+                            strBuilder.Append(sr.ReadLine());
+                        }
+
+                        responseTxt = strBuilder.ToString();
+                    }
+                }
+            }
+            catch (Exception exc)
+            {
+                responseTxt = string.Format("Error: {0}", exc.Message);
+            }
 
             int i;
             var coll = Request.Form;
             var sortedStr = coll.AllKeys;
 
             Array.Sort(sortedStr, StringComparer.InvariantCulture);
-
             var prestr = new StringBuilder();
 
             for (i = 0; i < sortedStr.Length; i++)
             {
-                if (coll[sortedStr[i]] != "" && sortedStr[i] != "sign" && sortedStr[i] != "sign_type")
-                {
-                    prestr.AppendFormat("{0}={1}", sortedStr[i], coll[sortedStr[i]]);
+                if (coll[sortedStr[i]] == "" || sortedStr[i] == "sign" || sortedStr[i] == "sign_type")
+                    continue;
 
-                    if (i < sortedStr.Length - 1)
-                    {
-                        prestr.Append("&");
-                    }
+                prestr.AppendFormat("{0}={1}", sortedStr[i], coll[sortedStr[i]]);
+
+                if (i < sortedStr.Length - 1)
+                {
+                    prestr.Append("&");
                 }
             }
 
             prestr.Append(key);
 
-            var mySign = processor.GetMD5(prestr.ToString(), _input_charset);
+            var mySign = processor.GetMD5(prestr.ToString());
 
             var sign = coll["sign"];
 
             if (mySign == sign && responseTxt == "true")
             {
-                switch (coll["trade_status"])
+                if (coll["trade_status"] == "TRADE_FINISHED" || coll["trade_status"] == "TRADE_SUCCESS")
                 {
-                    case "WAIT_BUYER_PAY":
-                    {
-                        var strOrderNo = coll["out_trade_no"];
-                        var strPrice = coll["total_fee"];
-                    }
-                        break;
-                    case "TRADE_FINISHED":
-                    case "TRADE_SUCCESS":
-                    {
-                        var strOrderNo = Request.Form["out_trade_no"];
-                        var strPrice = Request.Form["total_fee"];
-                        int orderId;
+                    var strOrderNo = Request.Form["out_trade_no"];
+                    int orderId;
 
-                        if (int.TryParse(strOrderNo, out orderId))
+                    if (int.TryParse(strOrderNo, out orderId))
+                    {
+                        var order = _orderService.GetOrderById(orderId);
+
+                        if (order != null && _orderProcessingService.CanMarkOrderAsPaid(order))
                         {
-                            var order = _orderService.GetOrderById(orderId);
-
-                            if (order != null && _orderProcessingService.CanMarkOrderAsPaid(order))
-                            {
-                                _orderProcessingService.MarkOrderAsPaid(order);
-                            }
+                            _orderProcessingService.MarkOrderAsPaid(order);
                         }
                     }
-                        break;
                 }
 
                 Response.Write("success");
@@ -214,9 +226,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
 
-            if (processor == null 
-                || !processor.IsPaymentMethodActive(_paymentSettings) 
-                || !processor.PluginDescriptor.Installed)
+            if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
                 throw new NopException("AliPay module cannot be loaded");
 
             return RedirectToAction("Index", "Home", new { area = "" });

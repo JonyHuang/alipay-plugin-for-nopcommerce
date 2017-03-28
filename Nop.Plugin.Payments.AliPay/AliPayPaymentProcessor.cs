@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Net;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web.Routing;
@@ -38,6 +37,7 @@ namespace Nop.Plugin.Payments.AliPay
         private readonly IWebHelper _webHelper;
         private readonly IStoreContext _storeContext;
         private readonly AliPayPaymentSettings _aliPayPaymentSettings;
+        private readonly ILocalizationService _localizationService;
 
         #endregion
 
@@ -47,12 +47,14 @@ namespace Nop.Plugin.Payments.AliPay
             ISettingService settingService, 
             IWebHelper webHelper,
             IStoreContext storeContext,
-            AliPayPaymentSettings aliPayPaymentSettings)
+            AliPayPaymentSettings aliPayPaymentSettings,
+            ILocalizationService localizationService)
         {
             this._settingService = settingService;
             this._webHelper = webHelper;
             this._storeContext = storeContext;
             this._aliPayPaymentSettings = aliPayPaymentSettings;
+            this._localizationService = localizationService;
         }
 
         #endregion
@@ -62,13 +64,12 @@ namespace Nop.Plugin.Payments.AliPay
         /// <summary>
         /// Gets MD5 hash
         /// </summary>
-        /// <param name="input">Input</param>
-        /// <param name="inputCharset">Input charset</param>
-        /// <returns>Result</returns>
-        internal string GetMD5(string input, string inputCharset)
+        /// <param name="input">Input string</param>
+        /// <returns>MD5 hash sum</returns>
+        internal string GetMD5(string input)
         {
-            MD5 md5 = new MD5CryptoServiceProvider();
-            byte[] t = md5.ComputeHash(Encoding.GetEncoding(inputCharset).GetBytes(input));
+            var md5 = new MD5CryptoServiceProvider();
+            var t = md5.ComputeHash(Encoding.GetEncoding(InputCharset).GetBytes(input));
             var sb = new StringBuilder(32);
 
             foreach (var b in t)
@@ -77,78 +78,6 @@ namespace Nop.Plugin.Payments.AliPay
             }
 
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Create URL
-        /// </summary>
-        /// <param name="para">Para</param>
-        /// <param name="inputCharset">Input charset</param>
-        /// <param name="key">Key</param>
-        /// <returns>Result</returns>
-        private string CreatUrl(string[] para, string inputCharset, string key)
-        {
-            Array.Sort(para, StringComparer.InvariantCulture);
-
-            int i;
-            var prestr = new StringBuilder();
-
-            for (i = 0; i < para.Length; i++)
-            {
-                prestr.Append(para[i]);
-
-                if (i < para.Length - 1)
-                {
-                    prestr.Append("&");
-                }
-            }
-
-            prestr.Append(key);
-
-            var sign = GetMD5(prestr.ToString(), inputCharset);
-
-            return sign;
-        }
-
-        /// <summary>
-        /// Gets HTTP
-        /// </summary>
-        /// <param name="strUrl">Url</param>
-        /// <param name="timeout">Timeout</param>
-        /// <returns>Result</returns>
-        internal string GetHttp(string strUrl, int timeout)
-        {
-            var strResult = string.Empty;
-
-            try
-            {
-                var myReq = (HttpWebRequest)WebRequest.Create(strUrl);
-
-                myReq.Timeout = timeout;
-
-                var httpWResp = (HttpWebResponse)myReq.GetResponse();
-                var myStream = httpWResp.GetResponseStream();
-                if (myStream != null)
-                {
-                    using (var sr = new StreamReader(myStream, Encoding.Default))
-                    {
-                        var strBuilder = new StringBuilder();
-
-                        while (-1 != sr.Peek())
-                        {
-                            strBuilder.Append(sr.ReadLine());
-                        }
-
-                        strResult = strBuilder.ToString();
-                    }
-                }
-            }
-            catch (Exception exc)
-            {
-                strResult = string.Format("Error: {0}", exc.Message);
-            }
-
-            return strResult;
         }
 
         #endregion
@@ -162,7 +91,7 @@ namespace Nop.Plugin.Payments.AliPay
         /// <returns>Process payment result</returns>
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            var result = new ProcessPaymentResult {NewPaymentStatus = PaymentStatus.Pending};
+            var result = new ProcessPaymentResult { NewPaymentStatus = PaymentStatus.Pending };
 
             return result;
         }
@@ -173,8 +102,6 @@ namespace Nop.Plugin.Payments.AliPay
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
         public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
         {
-            //string gateway = "https://www.alipay.com/cooperate/gateway.do?";
-
             var sellerEmail = _aliPayPaymentSettings.SellerEmail;
             var key = _aliPayPaymentSettings.Key;
             var partner = _aliPayPaymentSettings.Partner;
@@ -185,22 +112,24 @@ namespace Nop.Plugin.Payments.AliPay
             var notifyUrl = _webHelper.GetStoreLocation(false) + "Plugins/PaymentAliPay/Notify";
             var returnUrl = _webHelper.GetStoreLocation(false) + "Plugins/PaymentAliPay/Return";
 
-            string[] para ={
-                               "service=" + Service,
-                               "partner=" + partner,
-                               "seller_email=" + sellerEmail,
-                               "out_trade_no=" + outTradeNo,
-                               "subject=" + subject,
-                               "body=" + body,
-                               "total_fee=" + totalFee,
-                               "show_url=" + ShowUrl,
-                               "payment_type=1",
-                               "notify_url=" + notifyUrl,
-                               "return_url=" + returnUrl,
-                               "_input_charset=" + InputCharset
-                           };
+            string[] para =
+            {
+                "service=" + Service,
+                "partner=" + partner,
+                "seller_email=" + sellerEmail,
+                "out_trade_no=" + outTradeNo,
+                "subject=" + subject,
+                "body=" + body,
+                "total_fee=" + totalFee,
+                "show_url=" + ShowUrl,
+                "payment_type=1",
+                "notify_url=" + notifyUrl,
+                "return_url=" + returnUrl,
+                "_input_charset=" + InputCharset
+            };
 
-            var aliayUrl = CreatUrl(para, InputCharset, key);
+            Array.Sort(para, StringComparer.InvariantCulture);
+            var sign = GetMD5(para.Aggregate((all, curent) => all + "&" + curent) + key);
 
             var post = new RemotePost
             {
@@ -220,7 +149,7 @@ namespace Nop.Plugin.Payments.AliPay
             post.Add("return_url", returnUrl);
             post.Add("notify_url", notifyUrl);
             post.Add("payment_type", "1");
-            post.Add("sign", aliayUrl);
+            post.Add("sign", sign);
             post.Add("sign_type", SignType);
 
             post.Post();
@@ -350,7 +279,7 @@ namespace Nop.Plugin.Payments.AliPay
         {
             actionName = "Configure";
             controllerName = "PaymentAliPay";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Payments.AliPay.Controllers" }, { "area", null } };
+            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.AliPay.Controllers" }, { "area", null } };
         }
 
         /// <summary>
@@ -363,7 +292,7 @@ namespace Nop.Plugin.Payments.AliPay
         {
             actionName = "PaymentInfo";
             controllerName = "PaymentAliPay";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Payments.AliPay.Controllers" }, { "area", null } };
+            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.AliPay.Controllers" }, { "area", null } };
         }
 
         public Type GetControllerType()
@@ -374,11 +303,11 @@ namespace Nop.Plugin.Payments.AliPay
         public override void Install()
         {
             //settings
-            var settings = new AliPayPaymentSettings()
+            var settings = new AliPayPaymentSettings
             {
                 SellerEmail = "",
                 Key = "",
-                Partner= "",
+                Partner = "",
                 AdditionalFee = 0,
             };
 
@@ -394,6 +323,7 @@ namespace Nop.Plugin.Payments.AliPay
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Partner.Hint", "Enter partner.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee", "Additional fee");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.PaymentMethodDescription", "You will be redirected to AliPay site to complete the order.");
             
             base.Install();
         }
@@ -410,6 +340,7 @@ namespace Nop.Plugin.Payments.AliPay
             this.DeletePluginLocaleResource("Plugins.Payments.AliPay.Partner.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee");
             this.DeletePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.PaymentMethodDescription");
             
             base.Uninstall();
         }
@@ -490,6 +421,14 @@ namespace Nop.Plugin.Payments.AliPay
         public bool SkipPaymentInfo
         {
             get { return false; }
+        }
+
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        public string PaymentMethodDescription
+        {
+            get { return _localizationService.GetResource("Plugins.Payments.AliPay.PaymentMethodDescription"); }
         }
 
         #endregion
