@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web.Routing;
+using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
@@ -256,7 +256,7 @@ namespace Nop.Plugin.Payments.AliPay
         public bool CanRePostProcessPayment(Order order)
         {
             if (order == null)
-                throw new ArgumentNullException("order");
+                throw new ArgumentNullException(nameof(order));
 
             //AliPay is the redirection payment method
             //It also validates whether order is also paid (after redirection) so customers will not be able to pay twice
@@ -269,30 +269,28 @@ namespace Nop.Plugin.Payments.AliPay
             return !((DateTime.UtcNow - order.CreatedOnUtc).TotalMinutes < 1);
         }
 
-        /// <summary>
-        /// Gets a route for provider configuration
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetConfigurationRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
+        public IList<string> ValidatePaymentForm(IFormCollection form)
         {
-            actionName = "Configure";
-            controllerName = "PaymentAliPay";
-            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.AliPay.Controllers" }, { "area", null } };
+            var warnings = new List<string>();
+
+            return warnings;
         }
 
-        /// <summary>
-        /// Gets a route for payment info
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetPaymentInfoRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
+        public  ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
         {
-            actionName = "PaymentInfo";
-            controllerName = "PaymentAliPay";
-            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.AliPay.Controllers" }, { "area", null } };
+            var paymentInfo = new ProcessPaymentRequest();
+
+            return paymentInfo;
+        }
+
+        public override string GetConfigurationPageUrl()
+        {
+            return $"{_webHelper.GetStoreLocation()}Admin/PaymentAliPay/Configure";
+        }
+
+        public void GetPublicViewComponent(out string viewComponentName)
+        {
+            viewComponentName = "PaymentAliPay";
         }
 
         public Type GetControllerType()

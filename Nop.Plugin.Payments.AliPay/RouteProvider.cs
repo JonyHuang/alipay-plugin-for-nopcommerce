@@ -1,6 +1,6 @@
-﻿using System.Web.Mvc;
-using System.Web.Routing;
-using Nop.Web.Framework.Mvc.Routes;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Nop.Web.Framework.Mvc.Routing;
 
 namespace Nop.Plugin.Payments.AliPay
 {
@@ -8,21 +8,17 @@ namespace Nop.Plugin.Payments.AliPay
     {
         #region Methods
 
-        public void RegisterRoutes(RouteCollection routes)
+        public void RegisterRoutes(IRouteBuilder routeBuilder)
         {
             //Notify
-            routes.MapRoute("Plugin.Payments.AliPay.Notify",
+            routeBuilder.MapRoute("Plugin.Payments.AliPay.Notify",
                  "Plugins/PaymentAliPay/Notify",
-                 new { controller = "PaymentAliPay", action = "Notify" },
-                 new[] { "Nop.Plugin.Payments.AliPay.Controllers" }
-            );
+                 new { controller = "PaymentAliPay", action = "Notify" });
 
             //Notify
-            routes.MapRoute("Plugin.Payments.AliPay.Return",
+            routeBuilder.MapRoute("Plugin.Payments.AliPay.Return",
                  "Plugins/PaymentAliPay/Return",
-                 new { controller = "PaymentAliPay", action = "Return" },
-                 new[] { "Nop.Plugin.Payments.AliPay.Controllers" }
-            );
+                 new { controller = "PaymentAliPay", action = "Return" });
         }
 
         #endregion

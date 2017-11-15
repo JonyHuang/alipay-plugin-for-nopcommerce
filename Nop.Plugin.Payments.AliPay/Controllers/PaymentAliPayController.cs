@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Payments;
 using Nop.Plugin.Payments.AliPay.Models;
@@ -12,7 +12,9 @@ using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
+using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
+using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nop.Plugin.Payments.AliPay.Controllers
 {
@@ -56,9 +58,9 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
 
         #region Methods
 
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure()
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        public IActionResult Configure()
         {
             var model = new ConfigurationModel
             {
@@ -72,9 +74,9 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         }
 
         [HttpPost]
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure(ConfigurationModel model)
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        public IActionResult Configure(ConfigurationModel model)
         {
             if (!ModelState.IsValid)
                 return Configure();
@@ -91,31 +93,8 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
 
             return Configure();
         }
-
-        [ChildActionOnly]
-        public ActionResult PaymentInfo()
-        {
-            return View("~/Plugins/Payments.AliPay/Views/PaymentInfo.cshtml");
-        }
-
-        [NonAction]
-        public override IList<string> ValidatePaymentForm(FormCollection form)
-        {
-            var warnings = new List<string>();
-
-            return warnings;
-        }
-
-        [NonAction]
-        public override ProcessPaymentRequest GetPaymentInfo(FormCollection form)
-        {
-            var paymentInfo = new ProcessPaymentRequest();
-
-            return paymentInfo;
-        }
-
-        [ValidateInput(false)]
-        public ActionResult Notify(FormCollection form)
+        
+        public ActionResult Notify()
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
 
@@ -132,7 +111,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             if (string.IsNullOrEmpty(key))
                 throw new Exception("Partner is not set");
 
-            var alipayNotifyUrl = string.Format("https://www.alipay.com/cooperate/gateway.do?service=notify_verify&partner={0}&notify_id={1}", partner, Request.Form["notify_id"]);
+            var alipayNotifyUrl = $"https://www.alipay.com/cooperate/gateway.do?service=notify_verify&partner={partner}&notify_id={Request.Form["notify_id"]}";
 
             var responseTxt = string.Empty;
 
@@ -160,12 +139,12 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             }
             catch (Exception exc)
             {
-                responseTxt = string.Format("Error: {0}", exc.Message);
+                responseTxt = $"Error: {exc.Message}";
             }
 
             int i;
             var coll = Request.Form;
-            var sortedStr = coll.AllKeys;
+            var sortedStr = coll.Keys.ToArray();
 
             Array.Sort(sortedStr, StringComparer.InvariantCulture);
             var prestr = new StringBuilder();
@@ -189,6 +168,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
 
             var sign = coll["sign"];
 
+            byte[] data = null;
             if (mySign == sign && responseTxt == "true")
             {
                 if (coll["trade_status"] == "TRADE_FINISHED" || coll["trade_status"] == "TRADE_SUCCESS")
@@ -207,21 +187,22 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
                     }
                 }
 
-                Response.Write("success");
+                data = Encoding.UTF8.GetBytes("success");
+                
             }
             else
             {
-                Response.Write("fail");
+                data = Encoding.UTF8.GetBytes("fail");
 
-                var logStr = string.Format("MD5:mysign={0},sign={1},responseTxt={2}", mySign, sign, responseTxt);
+                var logStr = $"MD5:mysign={mySign},sign={sign},responseTxt={responseTxt}";
 
                 _logger.Error(logStr);
             }
-
+            
+            Response.Body.Write(data, 0, data.Length);
             return Content("");
         }
 
-        [ValidateInput(false)]
         public ActionResult Return()
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
