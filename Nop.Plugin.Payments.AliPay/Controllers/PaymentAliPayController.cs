@@ -94,7 +94,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             return Configure();
         }
         
-        public ActionResult Notify()
+        public ActionResult Notify(IpnModel model)
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
 
@@ -111,7 +111,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             if (string.IsNullOrEmpty(key))
                 throw new Exception("Partner is not set");
 
-            var alipayNotifyUrl = $"https://www.alipay.com/cooperate/gateway.do?service=notify_verify&partner={partner}&notify_id={Request.Form["notify_id"]}";
+            var alipayNotifyUrl = $"https://www.alipay.com/cooperate/gateway.do?service=notify_verify&partner={partner}&notify_id={model.Form["notify_id"]}";
 
             var responseTxt = string.Empty;
 
@@ -143,7 +143,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             }
 
             int i;
-            var coll = Request.Form;
+            var coll = model.Form;
             var sortedStr = coll.Keys.ToArray();
 
             Array.Sort(sortedStr, StringComparer.InvariantCulture);
@@ -173,7 +173,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             {
                 if (coll["trade_status"] == "TRADE_FINISHED" || coll["trade_status"] == "TRADE_SUCCESS")
                 {
-                    var strOrderNo = Request.Form["out_trade_no"];
+                    var strOrderNo = model.Form["out_trade_no"];
                     int orderId;
 
                     if (int.TryParse(strOrderNo, out orderId))
