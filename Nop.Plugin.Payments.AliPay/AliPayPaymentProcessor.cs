@@ -288,9 +288,9 @@ namespace Nop.Plugin.Payments.AliPay
             return $"{_webHelper.GetStoreLocation()}Admin/PaymentAliPay/Configure";
         }
 
-        public void GetPublicViewComponent(out string viewComponentName)
+        public string GetPublicViewComponentName()
         {
-            viewComponentName = "PaymentAliPay";
+            return "PaymentAliPay";
         }
 
         public Type GetControllerType()
@@ -312,16 +312,16 @@ namespace Nop.Plugin.Payments.AliPay
             _settingService.SaveSetting(settings);
 
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.RedirectionTip", "You will be redirected to AliPay site to complete the order.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail", "Seller email");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail.Hint", "Enter seller email.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Key", "Key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Key.Hint", "Enter key.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Partner", "Partner");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Partner.Hint", "Enter partner.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee", "Additional fee");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.PaymentMethodDescription", "You will be redirected to AliPay site to complete the order.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.RedirectionTip", "You will be redirected to AliPay site to complete the order.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail", "Seller email");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail.Hint", "Enter seller email.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Key", "Key");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Key.Hint", "Enter key.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Partner", "Partner");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.Partner.Hint", "Enter partner.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee", "Additional fee");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AliPay.PaymentMethodDescription", "You will be redirected to AliPay site to complete the order.");
             
             base.Install();
         }
@@ -329,16 +329,16 @@ namespace Nop.Plugin.Payments.AliPay
         public override void Uninstall()
         {
             //locales
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail.RedirectionTip");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.Key");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.Key.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.Partner");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.Partner.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.AliPay.PaymentMethodDescription");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail.RedirectionTip");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.SellerEmail.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.Key");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.Key.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.Partner");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.Partner.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.AdditionalFee.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AliPay.PaymentMethodDescription");
             
             base.Uninstall();
         }

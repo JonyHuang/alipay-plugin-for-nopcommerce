@@ -29,7 +29,6 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         private readonly ILogger _logger;
         private readonly ILocalizationService _localizationService;
         private readonly AliPayPaymentSettings _aliPayPaymentSettings;
-        private readonly PaymentSettings _paymentSettings;
 
         #endregion
 
@@ -41,8 +40,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             IOrderProcessingService orderProcessingService, 
             ILogger logger,
             ILocalizationService localizationService,
-            AliPayPaymentSettings aliPayPaymentSettings,
-            PaymentSettings paymentSettings)
+            AliPayPaymentSettings aliPayPaymentSettings)
         {
             this._settingService = settingService;
             this._paymentService = paymentService;
@@ -51,7 +49,6 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
             this._logger = logger;
             this._localizationService = localizationService;
             this._aliPayPaymentSettings = aliPayPaymentSettings;
-            this._paymentSettings = paymentSettings;
         }
 
         #endregion
@@ -98,7 +95,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
 
-            if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
+            if (processor == null || !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
                 throw new NopException("AliPay module cannot be loaded");
 
             var partner = _aliPayPaymentSettings.Partner;
@@ -207,7 +204,7 @@ namespace Nop.Plugin.Payments.AliPay.Controllers
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AliPay") as AliPayPaymentProcessor;
 
-            if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
+            if (processor == null || !_paymentService.IsPaymentMethodActive(processor) || !processor.PluginDescriptor.Installed)
                 throw new NopException("AliPay module cannot be loaded");
 
             return RedirectToAction("Index", "Home", new { area = "" });
